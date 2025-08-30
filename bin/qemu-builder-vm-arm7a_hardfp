@@ -1,0 +1,142 @@
+#!/bin/bash
+#
+
+#
+# OpenRC:
+#   ln --symbolic /var/lib/qemu-vms/qemu-builder-vm/qemu-builder-vm-arm7a_hardfp /etc/local.d/qemu-builder-vm-arm7a_hardfp.XXX.start
+#
+# Systemd:
+#   mkdir /etc/local.d
+#   ln --symbolic /var/lib/qemu-vms/qemu-builder-vm/qemu-builder-vm-arm7a_hardfp /etc/local.d/qemu-builder-vm-arm7a_hardfp.XXX.start
+#   ... make job: systemctl start local-d.service
+#
+
+RUN_SCRIPT=$(basename "$0")
+
+VM_SCRIPT=$(readlink --no-newline --canonicalize "$0")
+VM_SCRIPT_NAME=$(basename "${VM_SCRIPT}")
+VM_SCRIPT_DIR=$(dirname "${VM_SCRIPT}")
+
+# Convert /etc/local.d/qemu-builder-vm-arm7a_hardfp.03.start -> 03.start
+RUN_SCRIPT_EXT=${RUN_SCRIPT#*.}
+
+# Convert 26_infra_build_docker.start -> 26_infra_build_docker
+INSTANCE_NAME=${RUN_SCRIPT_EXT%.start*}
+
+# Convert 26_infra_build_docker -> 26
+INSTANCE_ID=$(echo "${INSTANCE_NAME}" | cut -f1 -d_)
+
+#echo "INSTANCE_NAME: ${INSTANCE_NAME}"
+#echo "INSTANCE_ID: ${INSTANCE_ID}"
+
+if [ -n "${INSTANCE_ID}" -a -n "${INSTANCE_NAME}" ]; then
+#    if [ "${INSTANCE_ID}" != "${VM_SCRIPT_NAME}" -a "${RUN_SCRIPT}" != "qemu-builder-vm-amd64" ]; then
+#        INSTANCE_ID=${INSTANCE_ID%.*}
+#        echo "TODO: Desribe this case" >&2
+#        exit 2
+#    fi
+    BACKING_FILE="${VM_SCRIPT_DIR}/${VM_SCRIPT_NAME}-${INSTANCE_NAME}.qcow2"
+    VM_NAME="${VM_SCRIPT_NAME}-${INSTANCE_NAME}"
+
+    MAC_ADDRESS_LOW=$(printf '%02x\n' "${INSTANCE_ID}")
+    MAC_ADDRESS="52:54:00:00:00:${MAC_ADDRESS_LOW}"
+else
+    BACKING_FILE="${VM_SCRIPT_DIR}/${VM_SCRIPT_NAME}.qcow2"
+    VM_NAME="${VM_SCRIPT_NAME}"
+
+    INSTANCE_NAME="00"
+
+    MAC_ADDRESS="52:54:00:00:00:00"
+fi
+echo "Resolved main VM '${VM_NAME}' using backing file '${BACKING_FILE}'."
+
+
+VM_CONFIG=${VM_SCRIPT_DIR}/${VM_NAME}.conf
+
+# echo RUN_SCRIPT: $RUN_SCRIPT
+# echo VM_SCRIPT_NAME: $VM_SCRIPT_NAME
+# echo VM_SCRIPT_DIR: $VM_SCRIPT_DIR
+# echo VM_CONFIG: $VM_CONFIG
+# echo VM_NAME: $VM_NAME
+
+# echo BACKING_FILE: $BACKING_FILE
+# file $BACKING_FILE
+
+# echo
+# ls -l $VM_SCRIPT_DIR
+
+if [ -f "${VM_CONFIG}" ]; then
+    source "${VM_CONFIG}"
+fi
+
+QEMU_OPTS=""
+
+if [ -n "${CPU}" ]; then
+    QEMU_OPTS="${QEMU_OPTS} -smp ${CPU}"
+else
+    QEMU_OPTS="${QEMU_OPTS} -smp 2"
+fi
+
+if [ -n "${MEM}" ]; then
+    QEMU_OPTS="${QEMU_OPTS} -m ${MEM}G"
+else
+    QEMU_OPTS="${QEMU_OPTS} -m 2G"
+fi
+
+if [ "${NETWORK}" == "bridge" ]; then
+    QEMU_OPTS="${QEMU_OPTS} -device virtio-net-device,netdev=vm_eth0,mac=${MAC_ADDRESS} -netdev bridge,id=vm_eth0"
+    if [ -n "${SSH_FORWARD_PORT}" ]; then
+        QEMU_OPTS="${QEMU_OPTS} -device virtio-net-device,netdev=vm_eth1 -netdev user,id=vm_eth1,hostfwd=tcp:0.0.0.0:${SSH_FORWARD_PORT}-:22"
+    fi
+else
+    QEMU_OPTS="${QEMU_OPTS} -device virtio-net-device,netdev=vmnic,mac=${MAC_ADDRESS}"
+    if [ -n "${SSH_FORWARD_PORT}" ]; then
+        QEMU_OPTS="${QEMU_OPTS} -netdev user,id=vmnic,hostname=${INSTANCE_NAME}.vm.tw00.in.zxteam.net,hostfwd=tcp:0.0.0.0:${SSH_FORWARD_PORT}-:22"
+    else
+        QEMU_OPTS="${QEMU_OPTS} -netdev user,id=vmnic,hostname=${INSTANCE_NAME}.vm.tw00.in.zxteam.net"
+    fi
+fi
+
+if [ -n "${VNC_DISPLAY}" ]; then
+    QEMU_OPTS="${QEMU_OPTS} -display vnc=0.0.0.0:${VNC_DISPLAY},password=on -monitor stdio"
+else
+    QEMU_OPTS="${QEMU_OPTS} -nographic"
+fi
+
+QEMU_OPTS="${QEMU_OPTS} -monitor unix:/run/${VM_NAME}.sock,server,nowait"
+
+if [ "${NO_SNAPSHOT}" != "yes" ]; then
+    QEMU_OPTS="${QEMU_OPTS} -snapshot"
+fi
+
+main() {
+
+    logger --tag "${VM_SCRIPT_NAME}" "VM start"
+
+    set -x
+
+    qemu-system-arm \
+        ${QEMU_OPTS} \
+        -machine virt \
+        -cpu cortex-a7 \
+        -kernel "/var/lib/qemu-vms/qemu-builder-vm/qemu-builder-vm-arm7a_hardfp.vmlinuz" \
+        -append 'root=/dev/vda ipv6.disable=1' \
+        -device virtio-blk-device,drive=disk0 \
+        -drive if=none,file=${BACKING_FILE},id=disk0 \
+        -device virtio-rng-pci \
+        -device virtio-keyboard-pci \
+        -name "${VM_NAME}"
+
+    logger --tag "${VM_SCRIPT_NAME}" "VM has been shutdown"
+
+    sleep 5
+}
+
+if [ "$DEBUG" == "yes" ]; then
+    main
+    exit $?
+else
+    while true; do
+        main
+    done &
+fi

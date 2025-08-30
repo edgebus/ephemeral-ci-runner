@@ -1,0 +1,1 @@
+Check out the [Code of Conduct](https://docs.edgebus.io/code-of-conduct)

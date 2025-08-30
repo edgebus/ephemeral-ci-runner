@@ -1,0 +1,1 @@
+Check out the [Contribution guide](https://docs.edgebus.io/contribution)

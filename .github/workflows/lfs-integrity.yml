@@ -1,0 +1,27 @@
+name: LFS Integrity Check
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+
+jobs:
+  verify-lfs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          lfs: true
+          fetch-depth: 0
+
+      - name: Install Git LFS
+        run: git lfs install
+
+      - name: Verify LFS pointers integrity
+        run: |
+          git lfs fsck --objects
+
+      - name: Check for misconfigured LFS files
+        run: |
+          git lfs status

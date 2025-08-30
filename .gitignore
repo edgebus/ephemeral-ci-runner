@@ -1,0 +1,6 @@
+releases/*/next/
+releases/*/next/
+
+*.local*
+
+.DS_Store
