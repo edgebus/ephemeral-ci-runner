@@ -1,30 +1,35 @@
 #!/bin/bash
 #
 
+#
+# OpenRC:
+#   ln --symbolic /var/lib/qemu-vms/qemu-builder-vm/qemu-builder-linux-arm7a_hardfp /etc/local.d/qemu-builder-linux-arm7a_hardfp.26_XX.start
+#
+# Systemd:
+#   mkdir /etc/local.d
+#   ln --symbolic /var/lib/qemu-vms/qemu-builder-vm/qemu-builder-linux-arm7a_hardfp /etc/local.d/qemu-builder-linux-arm7a_hardfp.26_XX.start
+#   ... make job: systemctl start local-d.service
+#
+
 RUN_SCRIPT=$(basename "$0")
 
 VM_SCRIPT=$(readlink --no-newline --canonicalize "$0")
 VM_SCRIPT_NAME=$(basename "${VM_SCRIPT}")
 VM_SCRIPT_DIR=$(dirname "${VM_SCRIPT}")
 
-# Convert /etc/local.d/qemu-builder-amd64-vm.26_infra_build_docker.start -> 26_infra_build_docker.start
+# Convert /etc/local.d/qemu-builder-linux-arm7a_hardfp.26_XX.start -> 26_XX.start
 RUN_SCRIPT_EXT=${RUN_SCRIPT#*.}
 
-# Convert 26_infra_build_docker.start -> 26_infra_build_docker
+# Convert 26_XX.start -> 26_XX
 INSTANCE_NAME=${RUN_SCRIPT_EXT%.start*}
 
-# Convert 26_infra_build_docker -> 26
+# Convert 26_XX -> 26
 INSTANCE_ID=$(echo "${INSTANCE_NAME}" | cut -f1 -d_)
 
 #echo "INSTANCE_NAME: ${INSTANCE_NAME}"
 #echo "INSTANCE_ID: ${INSTANCE_ID}"
 
 if [ -n "${INSTANCE_ID}" -a -n "${INSTANCE_NAME}" ]; then
-#    if [ "${INSTANCE_ID}" != "${VM_SCRIPT_NAME}" -a "${RUN_SCRIPT}" != "qemu-builder-vm-amd64" ]; then
-#        INSTANCE_ID=${INSTANCE_ID%.*}
-#        echo "TODO: Desribe this case" >&2
-#        exit 2
-#    fi
     BACKING_FILE="${VM_SCRIPT_DIR}/${VM_SCRIPT_NAME}-${INSTANCE_NAME}.qcow2"
     VM_NAME="${VM_SCRIPT_NAME}-${INSTANCE_NAME}"
 
@@ -48,13 +53,12 @@ VM_CONFIG=${VM_SCRIPT_DIR}/${VM_NAME}.conf
 # echo VM_SCRIPT_DIR: $VM_SCRIPT_DIR
 # echo VM_CONFIG: $VM_CONFIG
 # echo VM_NAME: $VM_NAME
-# echo USE_KVM: $USE_KVM
 
 # echo BACKING_FILE: $BACKING_FILE
 # file $BACKING_FILE
 
 # echo
-# ls -l $VM_SCRIPT_DIR
+# ls --format=verbose $VM_SCRIPT_DIR
 
 if [ -f "${VM_CONFIG}" ]; then
     source "${VM_CONFIG}"
@@ -62,20 +66,10 @@ fi
 
 QEMU_OPTS=""
 
-if [ "${USE_KVM}" == "yes" ]; then
-    QEMU_OPTS="${QEMU_OPTS} -enable-kvm"
-fi
-
 if [ -n "${CPU}" ]; then
     QEMU_OPTS="${QEMU_OPTS} -smp ${CPU}"
 else
     QEMU_OPTS="${QEMU_OPTS} -smp 2"
-fi
-
-if [ -n "${CPU_FLAGS}" ]; then
-    QEMU_OPTS="${QEMU_OPTS} -cpu ${CPU_FLAGS}"
-else
-    QEMU_OPTS="${QEMU_OPTS} -cpu max"
 fi
 
 if [ -n "${MEM}" ]; then
@@ -85,16 +79,16 @@ else
 fi
 
 if [ "${NETWORK}" == "bridge" ]; then
-    QEMU_OPTS="${QEMU_OPTS} -device virtio-net,netdev=vm_eth0,mac=${MAC_ADDRESS} -netdev bridge,id=vm_eth0"
+    QEMU_OPTS="${QEMU_OPTS} -device virtio-net-device,netdev=vm_eth0,mac=${MAC_ADDRESS} -netdev bridge,id=vm_eth0"
     if [ -n "${SSH_FORWARD_PORT}" ]; then
-        QEMU_OPTS="${QEMU_OPTS} -device virtio-net,netdev=vm_eth1 -netdev user,id=vm_eth1,hostfwd=tcp:0.0.0.0:${SSH_FORWARD_PORT}-:22"
+        QEMU_OPTS="${QEMU_OPTS} -device virtio-net-device,netdev=vm_eth1 -netdev user,id=vm_eth1,hostfwd=tcp:0.0.0.0:${SSH_FORWARD_PORT}-:22"
     fi
 else
-    QEMU_OPTS="${QEMU_OPTS} -device virtio-net,netdev=vmnic,mac=${MAC_ADDRESS}"
+    QEMU_OPTS="${QEMU_OPTS} -device virtio-net-device,netdev=vm_eth0,mac=${MAC_ADDRESS}"
     if [ -n "${SSH_FORWARD_PORT}" ]; then
-        QEMU_OPTS="${QEMU_OPTS} -netdev user,id=vmnic,hostname=${INSTANCE_NAME}.vm.tw02.in.zxteam.net,hostfwd=tcp:0.0.0.0:${SSH_FORWARD_PORT}-:22"
+        QEMU_OPTS="${QEMU_OPTS} -netdev user,id=vm_eth0,hostname=${INSTANCE_NAME}.vm.tw00.in.zxteam.net,hostfwd=tcp:0.0.0.0:${SSH_FORWARD_PORT}-:22"
     else
-        QEMU_OPTS="${QEMU_OPTS} -netdev user,id=vmnic,hostname=${INSTANCE_NAME}.vm.tw02.in.zxteam.net"
+        QEMU_OPTS="${QEMU_OPTS} -netdev user,id=vm_eth0,hostname=${INSTANCE_NAME}.vm.tw00.in.zxteam.net"
     fi
 fi
 
@@ -116,12 +110,13 @@ main() {
 
     set -x
 
-    qemu-system-x86_64 \
+    qemu-system-arm \
         ${QEMU_OPTS} \
-        -machine pc \
-        -kernel "/var/lib/qemu-vms/qemu-builder-vm/qemu-builder-vm-amd64.vmlinuz" \
+        -machine virt \
+        -cpu cortex-a7 \
+        -kernel "/var/lib/qemu-vms/qemu-builder-vm/qemu-builder-linux-arm7a_hardfp.vmlinuz" \
         -append 'root=/dev/vda ipv6.disable=1' \
-        -device virtio-blk,drive=disk0 \
+        -device virtio-blk-device,drive=disk0 \
         -drive if=none,file=${BACKING_FILE},id=disk0 \
         -device virtio-rng-pci \
         -device virtio-keyboard-pci \
