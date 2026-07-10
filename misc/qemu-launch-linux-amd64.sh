@@ -8,8 +8,8 @@ SCRIPT_DIR=$(cd $(dirname "$0") && pwd -LP)
 
 REVISION=$(basename "${SCRIPT_DIR}")
 
-KERNEL_PATH="${SCRIPT_DIR}/amd64.bzImage"
-DRIVE_FILE="${SCRIPT_DIR}/amd64.qcow2"
+KERNEL_PATH="${SCRIPT_DIR}/linux-amd64.bzImage"
+DRIVE_FILE="${SCRIPT_DIR}/linux-amd64.qcow2"
 
 SNAPSHOT="yes"
 FORWARD_SSH_PORT=""

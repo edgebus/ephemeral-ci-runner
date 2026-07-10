@@ -8,8 +8,8 @@ SCRIPT_DIR=$(cd $(dirname "$0") && pwd -LP)
 
 REVISION=$(basename "${SCRIPT_DIR}")
 
-KERNEL_PATH="${SCRIPT_DIR}/arm7a_hardfp.zImage"
-DRIVE_FILE="${SCRIPT_DIR}/arm7a_hardfp.qcow2"
+KERNEL_PATH="${SCRIPT_DIR}/linux-arm7a_hardfp.zImage"
+DRIVE_FILE="${SCRIPT_DIR}/linux-arm7a_hardfp.qcow2"
 
 SNAPSHOT="yes"
 FORWARD_SSH_PORT=""
