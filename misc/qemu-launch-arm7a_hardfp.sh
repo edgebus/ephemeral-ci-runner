@@ -1,6 +1,8 @@
 #!/bin/sh
 #
 
+set -eo pipefail
+
 # Normalize SCRIPT_DIR
 SCRIPT_DIR=$(cd $(dirname "$0") && pwd -LP)
 
@@ -32,10 +34,12 @@ while (( "$#" )); do
 	shift
 done
 
-QEMU_ADDITIONAL_OPTS="-netdev user,id=vmnic,hostname=arm7a_hardfp-${REVISION}"
 if [ -n "${FORWARD_SSH_PORT}" ]; then
-  QEMU_ADDITIONAL_OPTS="${QEMU_ADDITIONAL_OPTS} -netdev user,id=vmnic,hostname=arm7a_hardfp-${REVISION},hostfwd=tcp:0.0.0.0:60022-:22"
+  QEMU_ADDITIONAL_OPTS="${QEMU_ADDITIONAL_OPTS} -netdev user,id=vm_eth0,hostname=arm7a_hardfp-${REVISION},hostfwd=tcp:0.0.0.0:60022-:22"
+else
+  QEMU_ADDITIONAL_OPTS="${QEMU_ADDITIONAL_OPTS} -netdev user,id=vm_eth0,hostname=arm7a_hardfp-${REVISION}"
 fi
+
 if [ "${SNAPSHOT}" == "yes" ]; then
   QEMU_ADDITIONAL_OPTS="${QEMU_ADDITIONAL_OPTS} -snapshot"
 fi
@@ -49,7 +53,7 @@ qemu-system-arm \
   -append 'root=/dev/vda' \
   -device virtio-blk-device,drive=disk0 \
   -device virtio-keyboard-pci \
-  -device virtio-net-device,netdev=vmnic \
+  -device virtio-net-device,netdev=vm_eth0 \
   -device virtio-rng-pci \
   -drive if=none,file=${DRIVE_FILE},id=disk0 \
   -nographic \
