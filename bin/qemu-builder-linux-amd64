@@ -125,7 +125,7 @@ main() {
     qemu-system-x86_64 \
         ${QEMU_OPTS} \
         -machine pc \
-        -kernel "/var/lib/qemu-vms/qemu-builder-vm/qemu-builder-linux-amd64.vmlinuz" \
+        -kernel "/var/lib/qemu-vms/qemu-builder/qemu-builder-linux-amd64.vmlinuz" \
         -append 'root=/dev/vda ipv6.disable=1' \
         -device virtio-blk,drive=disk0 \
         -drive if=none,file=${BACKING_FILE},id=disk0 \
