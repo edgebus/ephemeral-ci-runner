@@ -3,11 +3,11 @@
 
 #
 # OpenRC:
-#   ln --symbolic /var/lib/qemu-vms/qemu-builder-vm/qemu-builder-linux-arm7a_hardfp /etc/local.d/qemu-builder-linux-arm7a_hardfp.26_XX.start
+#   ln --symbolic /var/lib/qemu-vms/qemu-builder/qemu-builder-linux-arm7a_hardfp /etc/local.d/qemu-builder-linux-arm7a_hardfp.26_XX.start
 #
 # Systemd:
 #   mkdir /etc/local.d
-#   ln --symbolic /var/lib/qemu-vms/qemu-builder-vm/qemu-builder-linux-arm7a_hardfp /etc/local.d/qemu-builder-linux-arm7a_hardfp.26_XX.start
+#   ln --symbolic /var/lib/qemu-vms/qemu-builder/qemu-builder-linux-arm7a_hardfp /etc/local.d/qemu-builder-linux-arm7a_hardfp.26_XX.start
 #   ... make job: systemctl start local-d.service
 #
 
@@ -121,6 +121,8 @@ main() {
         -device virtio-rng-pci \
         -device virtio-keyboard-pci \
         -name "${VM_NAME}"
+
+    set +x
 
     logger --tag "${VM_SCRIPT_NAME}" "VM has been shutdown"
 

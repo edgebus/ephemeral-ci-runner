@@ -3,11 +3,11 @@
 
 #
 # OpenRC:
-#   ln --symbolic /var/lib/qemu-vms/qemu-builder-vm/qemu-builder-linux-amd64 /etc/local.d/qemu-builder-linux-amd64.26_XX.start
+#   ln --symbolic /var/lib/qemu-vms/qemu-builder/qemu-builder-windows11-amd64 /etc/local.d/qemu-builder-windows11-amd64.26_XX.start
 #
 # Systemd:
 #   mkdir /etc/local.d
-#   ln --symbolic /var/lib/qemu-vms/qemu-builder-vm/qemu-builder-linux-amd64 /etc/local.d/qemu-builder-linux-amd64.26_XX.start
+#   ln --symbolic /var/lib/qemu-vms/qemu-builder/qemu-builder-windows11-amd64 /etc/local.d/qemu-builder-windows11-amd64.26_XX.start
 #   ... make job: systemctl start local-d.service
 #
 
@@ -17,7 +17,7 @@ VM_SCRIPT=$(readlink --no-newline --canonicalize "$0")
 VM_SCRIPT_NAME=$(basename "${VM_SCRIPT}")
 VM_SCRIPT_DIR=$(dirname "${VM_SCRIPT}")
 
-# Convert /etc/local.d/qemu-builder-linux-amd64.26_XX.start -> 26_XX.start
+# Convert /etc/local.d/qemu-builder-windows11-amd64.26_XX.start -> 26_XX.start
 RUN_SCRIPT_EXT=${RUN_SCRIPT#*.}
 
 # Convert 26_XX.start -> 26_XX
@@ -32,16 +32,18 @@ INSTANCE_ID=$(echo "${INSTANCE_NAME}" | cut -f1 -d_)
 if [ -n "${INSTANCE_ID}" -a -n "${INSTANCE_NAME}" ]; then
     BACKING_FILE="${VM_SCRIPT_DIR}/${VM_SCRIPT_NAME}-${INSTANCE_NAME}.qcow2"
     VM_NAME="${VM_SCRIPT_NAME}-${INSTANCE_NAME}"
+    VM_STATE_DIR="${VM_SCRIPT_DIR}/${VM_SCRIPT_NAME}-${INSTANCE_NAME}.state"
 
     MAC_ADDRESS_LOW=$(printf '%02x\n' "${INSTANCE_ID}")
-    MAC_ADDRESS="52:54:00:00:00:${MAC_ADDRESS_LOW}"
+    MAC_ADDRESS="52:54:00:01:00:${MAC_ADDRESS_LOW}"
 else
     BACKING_FILE="${VM_SCRIPT_DIR}/${VM_SCRIPT_NAME}.qcow2"
     VM_NAME="${VM_SCRIPT_NAME}"
+    VM_STATE_DIR="${VM_SCRIPT_DIR}/${VM_SCRIPT_NAME}.state"
 
     INSTANCE_NAME="00"
 
-    MAC_ADDRESS="52:54:00:00:00:00"
+    MAC_ADDRESS="52:54:00:01:00:00"
 fi
 echo "Resolved main VM '${VM_NAME}' using backing file '${BACKING_FILE}'."
 
@@ -51,6 +53,7 @@ VM_CONFIG=${VM_SCRIPT_DIR}/${VM_NAME}.conf
 # echo RUN_SCRIPT: $RUN_SCRIPT
 # echo VM_SCRIPT_NAME: $VM_SCRIPT_NAME
 # echo VM_SCRIPT_DIR: $VM_SCRIPT_DIR
+# echo VM_STATE_DIR: $VM_STATE_DIR
 # echo VM_CONFIG: $VM_CONFIG
 # echo VM_NAME: $VM_NAME
 # echo USE_KVM: $USE_KVM
@@ -68,14 +71,14 @@ fi
 QEMU_OPTS=""
 
 if [ "${USE_KVM}" == "yes" ]; then
-    #QEMU_OPTS="${QEMU_OPTS} -accel kvm"
-    QEMU_OPTS="${QEMU_OPTS} -enable-kvm"
+    QEMU_OPTS="${QEMU_OPTS} -accel kvm"
+    #QEMU_OPTS="${QEMU_OPTS} -enable-kvm"
 fi
 
 if [ -n "${CPU}" ]; then
     QEMU_OPTS="${QEMU_OPTS} -smp ${CPU}"
 else
-    QEMU_OPTS="${QEMU_OPTS} -smp 2"
+    QEMU_OPTS="${QEMU_OPTS} -smp 4"
 fi
 
 if [ -n "${CPU_FLAGS}" ]; then
@@ -87,18 +90,18 @@ fi
 if [ -n "${MEM}" ]; then
     QEMU_OPTS="${QEMU_OPTS} -m ${MEM}G"
 else
-    QEMU_OPTS="${QEMU_OPTS} -m 2G"
+    QEMU_OPTS="${QEMU_OPTS} -m 8G"
 fi
 
 if [ "${NETWORK}" == "bridge" ]; then
-    QEMU_OPTS="${QEMU_OPTS} -device virtio-net,netdev=vm_eth0,mac=${MAC_ADDRESS} -netdev bridge,id=vm_eth0"
-    if [ -n "${SSH_FORWARD_PORT}" ]; then
-        QEMU_OPTS="${QEMU_OPTS} -device virtio-net,netdev=vm_eth1 -netdev user,id=vm_eth1,hostfwd=tcp:0.0.0.0:${SSH_FORWARD_PORT}-:22"
+    QEMU_OPTS="${QEMU_OPTS} -device e1000e,netdev=vm_eth0,mac=${MAC_ADDRESS} -netdev -netdev bridge,id=vm_eth0"
+    if [ -n "${RDP_FORWARD_PORT}" ]; then
+        QEMU_OPTS="${QEMU_OPTS} -device e1000e,netdev=vm_eth1 -netdev user,id=vm_eth1,hostfwd=tcp:0.0.0.0:${RDP_FORWARD_PORT}-:3389"
     fi
 else
-    QEMU_OPTS="${QEMU_OPTS} -device virtio-net,netdev=vm_eth0,mac=${MAC_ADDRESS}"
-    if [ -n "${SSH_FORWARD_PORT}" ]; then
-        QEMU_OPTS="${QEMU_OPTS} -netdev user,id=vm_eth0,hostname=${INSTANCE_NAME}.vm.tw02.in.zxteam.net,hostfwd=tcp:0.0.0.0:${SSH_FORWARD_PORT}-:22"
+    QEMU_OPTS="${QEMU_OPTS} -device e1000e,netdev=vm_eth0,mac=${MAC_ADDRESS}"
+    if [ -n "${RDP_FORWARD_PORT}" ]; then
+        QEMU_OPTS="${QEMU_OPTS} -netdev user,id=vm_eth0,hostname=${INSTANCE_NAME}.vm.tw02.in.zxteam.net,hostfwd=tcp:0.0.0.0:${RDP_FORWARD_PORT}-:3389"
     else
         QEMU_OPTS="${QEMU_OPTS} -netdev user,id=vm_eth0,hostname=${INSTANCE_NAME}.vm.tw02.in.zxteam.net"
     fi
@@ -116,21 +119,48 @@ if [ "${NO_SNAPSHOT}" != "yes" ]; then
     QEMU_OPTS="${QEMU_OPTS} -snapshot"
 fi
 
+if [ ! -d "${VM_STATE_DIR}" ]; then
+    mkdir "${VM_STATE_DIR}"
+fi
+
+set -e
+
+if [ ! -f "${VM_STATE_DIR}/OVMF_VARS.fd" ]; then
+  cp -aL /usr/share/edk2/OvmfX64/OVMF_VARS.secboot.fd "${VM_STATE_DIR}/OVMF_VARS.fd"
+fi
+
+if [ ! -d "${VM_STATE_DIR}/tpm" ]; then
+    mkdir "${VM_STATE_DIR}/tpm"
+    swtpm_setup --tpm2 --tpmstate "${VM_STATE_DIR}/tpm"
+fi
+
 main() {
 
     logger --tag "${VM_SCRIPT_NAME}" "VM start"
+
+    TPM_SOCKET="/tmp/swtpm-$$-${VM_NAME}.sock"
+    swtpm socket --tpm2 --daemon --terminate --tpmstate dir="${VM_STATE_DIR}/tpm" --ctrl type=unixio,path="${TPM_SOCKET}"
+
+    sleep 1
+    while [ ! -S "${TPM_SOCKET}" ]; do
+    echo "Wait for ${TPM_SOCKET} ..." >&2
+    sleep 1
+    done
 
     set -x
 
     qemu-system-x86_64 \
         ${QEMU_OPTS} \
-        -machine pc \
-        -kernel "/var/lib/qemu-vms/qemu-builder-vm/qemu-builder-linux-amd64.vmlinuz" \
-        -append 'root=/dev/vda ipv6.disable=1' \
-        -device virtio-blk,drive=disk0 \
+        -machine q35 \
+        -chardev socket,id=chrtpm,path="${TPM_SOCKET}" \
+        -tpmdev emulator,id=tpm0,chardev=chrtpm \
+        -device tpm-tis,tpmdev=tpm0 \
+        -device nvme,drive=disk0,serial=1 \
+        -device qemu-xhci \
+        -device usb-tablet \
         -drive if=none,file=${BACKING_FILE},id=disk0 \
-        -device virtio-rng-pci \
-        -device virtio-keyboard-pci \
+        -drive if=pflash,format=raw,readonly=on,file=/usr/share/edk2/OvmfX64/OVMF_CODE.secboot.fd \
+        -drive if=pflash,format=raw,file="${VM_STATE_DIR}/OVMF_VARS.fd" \
         -name "${VM_NAME}"
 
     set +x
