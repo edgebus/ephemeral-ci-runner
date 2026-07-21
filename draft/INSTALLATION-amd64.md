@@ -384,7 +384,7 @@ open vnc://127.0.0.1:5900
 export INSTANCE_ID="25"
 export DRIVE_BACKING_FILE=/var/lib/qemu-vms/qemu-builder-vm/qemu-builder-vm-amd64.qcow2
 export DRIVE_INSTANCE_FILE="/var/lib/qemu-vms/qemu-builder-vm/qemu-builder-vm-amd64-${INSTANCE_ID}.qcow2"
-qemu-img create -F qcow2 -b "${DRIVE_BACKING_FILE}" -f qcow2 "${DRIVE_INSTANCE_FILE}"
+qemu-img create -F qcow2 -f qcow2 -b "${DRIVE_BACKING_FILE}" "${DRIVE_INSTANCE_FILE}"
 ```
 
 ### Create configuration
