@@ -15,6 +15,8 @@ SNAPSHOT="yes"
 FORWARD_SSH_PORT=""
 DISPLAY_VNC=""
 NETWORK_BRIDGE_DEV=""
+QEMU_MEM="4G" # qemu-system-x86_64 ... -m "${QEMU_MEM}"   ...
+QEMU_SMP="2"  # qemu-system-x86_64 ... -smp "${QEMU_SMP}" ...
 
 QEMU_ADDITIONAL_OPTS=""
 
@@ -25,15 +27,29 @@ while (( "$#" )); do
                         ;;
                 --ssh-port=*)
                         FORWARD_SSH_PORT="$(echo "$1" | cut -d= -f2)"
+                        # TODO: validate FORWARD_SSH_PORT
                         ;;
                 --no-snapshot)
                         SNAPSHOT="no"
                         ;;
                 --display-vnc=*)
                         DISPLAY_VNC="$(echo "$1" | cut -d= -f2)"
+                        # TODO: validate DISPLAY_VNC
+                        ;;
+                --install-iso=*)
+                        INSTALL_ISO="$(echo "$1" | cut -d= -f2)"
                         ;;
                 --net-bridge-dev=*)
                         NETWORK_BRIDGE_DEV="$(echo "$1" | cut -d= -f2)"
+                        # TODO: validate NETWORK_BRIDGE_DEV
+                        ;;
+                --mem=*)
+                        QEMU_MEM="$(echo "$1" | cut -d= -f2)"
+                        # TODO: validate QEMU_MEM
+                        ;;
+                --cpus=*)
+                        QEMU_SMP="$(echo "$1" | cut -d= -f2)"
+                        # TODO: validate QEMU_SMP
                         ;;
                 --)
                         shift
@@ -54,6 +70,10 @@ fi
 
 if [ -n "${DISPLAY_VNC}" ]; then
         QEMU_ADDITIONAL_OPTS="${QEMU_ADDITIONAL_OPTS} -display vnc=:${DISPLAY_VNC},password=off"
+fi
+
+if [ -n "${INSTALL_ISO}" ]; then
+        QEMU_ADDITIONAL_OPTS="${QEMU_ADDITIONAL_OPTS} -device ide-cd,bus=ide.1,drive=cdrom0 -drive if=none,file=${INSTALL_ISO},media=cdrom,id=cdrom0"
 fi
 
 if [ -n "${NETWORK_BRIDGE_DEV}" ]; then
@@ -91,8 +111,8 @@ set -x
 qemu-system-x86_64 \
   -machine pc \
   -cpu qemu64-v1 \
-  -smp 2 \
-  -m 4G \
+  -smp "${QEMU_SMP}" \
+  -m "${QEMU_MEM}" \
   -kernel "${KERNEL_PATH}" \
   -append 'root=/dev/vda console=ttyS0' \
   -device virtio-blk,drive=disk0 \

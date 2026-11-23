@@ -20,6 +20,8 @@ FORWARD_RDP_PORT=""
 DISPLAY_VNC=""
 INSTALL_ISO=""
 NETWORK_BRIDGE_DEV=""
+QEMU_MEM="16G" # qemu-system-x86_64 ... -m "${QEMU_MEM}"   ...
+QEMU_SMP="4"   # qemu-system-x86_64 ... -smp "${QEMU_SMP}" ...
 
 QEMU_ADDITIONAL_OPTS=""
 
@@ -30,18 +32,29 @@ while (( "$#" )); do
                         ;;
                 --rdp-port=*)
                         FORWARD_RDP_PORT="$(echo "$1" | cut -d= -f2)"
+                        # TODO: validate FORWARD_RDP_PORT
                         ;;
                 --no-snapshot)
                         SNAPSHOT="no"
                         ;;
                 --display-vnc=*)
                         DISPLAY_VNC="$(echo "$1" | cut -d= -f2)"
+                        # TODO: validate DISPLAY_VNC
                         ;;
                 --install-iso=*)
                         INSTALL_ISO="$(echo "$1" | cut -d= -f2)"
                         ;;
                 --net-bridge-dev=*)
                         NETWORK_BRIDGE_DEV="$(echo "$1" | cut -d= -f2)"
+                        # TODO: validate NETWORK_BRIDGE_DEV
+                        ;;
+                --mem=*)
+                        QEMU_MEM="$(echo "$1" | cut -d= -f2)"
+                        # TODO: validate QEMU_MEM
+                        ;;
+                --cpus=*)
+                        QEMU_SMP="$(echo "$1" | cut -d= -f2)"
+                        # TODO: validate QEMU_SMP
                         ;;
                 --)
                         shift
@@ -127,8 +140,8 @@ set -x
 qemu-system-x86_64 \
   -machine q35 \
   -cpu IvyBridge-v1 \
-  -smp 4 \
-  -m 16G \
+  -smp "${QEMU_SMP}" \
+  -m "${QEMU_MEM}" \
   -chardev socket,id=chrtpm,path="${TPM_SOCKET}" \
   -tpmdev emulator,id=tpm0,chardev=chrtpm \
   -device tpm-tis,tpmdev=tpm0 \

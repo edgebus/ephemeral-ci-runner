@@ -15,6 +15,8 @@ SNAPSHOT="yes"
 FORWARD_SSH_PORT=""
 DISPLAY_VNC=""
 NETWORK_BRIDGE_DEV=""
+QEMU_MEM="4G" # qemu-system-x86_64 ... -m "${QEMU_MEM}"   ...
+QEMU_SMP="2"  # qemu-system-x86_64 ... -smp "${QEMU_SMP}" ...
 
 QEMU_ADDITIONAL_OPTS=""
 
@@ -25,6 +27,7 @@ while (( "$#" )); do
                         ;;
                 --ssh-port=*)
                         FORWARD_SSH_PORT="$(echo "$1" | cut -d= -f2)"
+                        # TODO: validate FORWARD_SSH_PORT
                         ;;
                 --no-snapshot)
                         SNAPSHOT="no"
@@ -34,6 +37,15 @@ while (( "$#" )); do
                         ;;
                 --net-bridge-dev=*)
                         NETWORK_BRIDGE_DEV="$(echo "$1" | cut -d= -f2)"
+                        # TODO: validate NETWORK_BRIDGE_DEV
+                        ;;
+                --mem=*)
+                        QEMU_MEM="$(echo "$1" | cut -d= -f2)"
+                        # TODO: validate QEMU_MEM
+                        ;;
+                --cpus=*)
+                        QEMU_SMP="$(echo "$1" | cut -d= -f2)"
+                        # TODO: validate QEMU_SMP
                         ;;
                 --)
                         shift
@@ -85,8 +97,8 @@ set -x
 qemu-system-arm \
   -machine virt \
   -cpu cortex-a7 \
-  -smp 2 \
-  -m 4G \
+  -smp "${QEMU_SMP}" \
+  -m "${QEMU_MEM}" \
   -kernel "${KERNEL_PATH}" \
   -append 'root=/dev/vda' \
   -device virtio-blk-device,drive=disk0 \
